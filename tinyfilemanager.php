@@ -102,7 +102,7 @@ $favicon_path = '';
 // Files and folders to excluded from listing
 // e.g. array('myfile.html', 'personal-folder', '*.php', ...)
 $exclude_items = array(
-    $thumb_folder
+    substr($thumb_folder, 1)
 );
 
 // Online office Docs Viewer
@@ -1747,7 +1747,32 @@ if (isset($_GET['view'])) {
                 // Image info
                 if ($is_image) {
                     $image_size = getimagesize($file_path);
+                    $exifData = exif_read_data($file_path);
                     echo '<strong>'.lng('Image size').':</strong> ' . (isset($image_size[0]) ? $image_size[0] : '0') . ' x ' . (isset($image_size[1]) ? $image_size[1] : '0') . '<br>';
+                    echo '<br>';
+
+                    if ($exifData) {
+                        $exp_time = round(math_div_string($exifData['ExposureTime']),2);
+                        $exposureTime = $exp_time > 0.25 ? $exp_time : $exifData['ExposureTime'];
+
+                        $datetime = explode(':', str_replace(' ', ':', $exifData['DateTimeOriginal']));
+                        if(count($datetime) == 6) {
+                            $datetimeOriginal = date("Y-m-d H:i:s", mktime((int)$datetime[3], (int)$datetime[4], (int)$datetime[5], (int)$datetime[1], (int)$datetime[2], (int)$datetime[0]));
+                        }
+
+                        echo '<strong>EXIF</strong><br>';
+                        echo '<strong>Camera:</strong> '.$exifData['Make'].' '.$exifData['Model'].'<br>';
+                        echo '<strong>Lens:</strong> '.$exifData['UndefinedTag:0xA434'].'<br>';
+                        echo '<strong>Taken:</strong> '.$datetimeOriginal.'<br>';
+                        echo '<strong>Shutter:</strong> '.$exposureTime.'s<br>';
+                        echo '<strong>Aperature:</strong> f'.drop_zero_fraction(round(math_div_string($exifData['FNumber']),1),1).'<br>';
+                        echo '<strong>ISO:</strong> '.$exifData['ISOSpeedRatings'].'<br>';
+                        echo '<strong>Focal length:</strong> '.round(math_div_string($exifData['FocalLength']),1).'mm';
+                        if (isset($exifData['FocalLengthIn35mmFilm'])) {
+                            echo ' ('.$exifData['FocalLengthIn35mmFilm'].'mm equiv)';
+                        }
+                    }
+
                 }
                 // Text info
                 if ($is_text) {
@@ -2236,7 +2261,7 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
     <?php } else { ?>
         <div class="row">
             <?php if ($parent !== false) { ?>
-                <div class="col-sm-3 mb-4">
+                <div class="col-sm-4 col-md-3 col-lg-2 mb-4">
                     <a href="?p=<?php echo urlencode($parent) ?>">
                         <div class="card text-center grid-card">
                             <div class="p-2 grid-card-top">
@@ -2258,7 +2283,7 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                 $img = $is_link ? 'icon-link_folder' : 'fa fa-folder-o';
             ?>
 
-                <div class="col-sm-3 mb-4">
+                <div class="col-sm-4 col-md-3 col-lg-2 mb-4">
                     <a href="?p=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>">
                         <div class="card text-center grid-card">
                             <div class="p-2 grid-card-top">
@@ -2280,8 +2305,11 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                     $is_link = is_link($path . '/' . $f);
                     $img = $is_link ? 'fa fa-file-text-o' : fm_get_file_icon_class($path . '/' . $f);
                     $filelink = '?p=' . urlencode(FM_PATH) . '&amp;view=' . urlencode($f);
+                    $filesize_raw = fm_get_size($path . '/' . $f);
+                    $filesize = fm_get_filesize($filesize_raw);
+                    $all_files_size += $filesize_raw;
             ?>
-                <div class="col-sm-3 mb-4">
+                <div class="col-sm-4 col-md-3 col-lg-2 mb-4">
                     <a href="<?php echo $filelink ?>">
                         <div class="card text-center grid-card">
                             <?php
@@ -2306,6 +2334,17 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                     </a>
                 </div>
             <?php }?>
+            <div>
+                <table class="table table-bordered table-sm <?php echo $tableTheme; ?>">
+                    <tr>
+                        <td class="gray" colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? (FM_READONLY ? '6' :'7') : (FM_READONLY ? '4' : '5') ?>">
+                            <?php echo lng('FullSize').': <span class="badge text-bg-light border-radius-0">'.fm_get_filesize($all_files_size).'</span>' ?>
+                            <?php echo lng('File').': <span class="badge text-bg-light border-radius-0">'.$num_files.'</span>' ?>
+                            <?php echo lng('Folder').': <span class="badge text-bg-light border-radius-0">'.$num_folders.'</span>' ?>
+                        </td>
+                    </tr>
+                </table>
+            </div>
         </div>
     <?php } ?>
 
@@ -3240,13 +3279,14 @@ function fm_get_file_mimes($extension)
 function fm_get_thumbnail($file, $p, $f) {
     $thumbMaxWidth = 160;
     $thumbMaxHeight= 160;
-    $destImageFolder = FM_ROOT_PATH.FM_THUMB_FOLDER.'/'.$p;
-    if (!file_exists($destImageFolder)) {
-        mkdir($destImageFolder);
-    }
+    $destImageFolder = FM_ROOT_PATH.FM_THUMB_FOLDER.'/'.urldecode($p);
+    $sourceFilePath = FM_ROOT_PATH.'/'.$p.'/'.$f;
     $destImagePath = $destImageFolder.'/'.$f;
+    if (!file_exists($destImageFolder)) {
+        mkdir($destImageFolder, 0777, true);
+    }
     if (!file_exists($destImagePath)) {
-        $sourceImage = imagecreatefromjpeg($file);
+        $sourceImage = imagecreatefromjpeg($sourceFilePath);
         $orgWidth = imagesx($sourceImage);
         $orgHeight = imagesy($sourceImage);
 
@@ -3267,6 +3307,26 @@ function fm_get_thumbnail($file, $p, $f) {
     $thumbUrl = FM_ROOT_URL.FM_THUMB_FOLDER.'/'.$p.'/'.$f;
     // var_dump($thumbUrl);
     return $thumbUrl;
+}
+
+function math_div_string($string) {
+    $numbers = explode('/', $string);
+    if (count($numbers)==2) {
+        if(is_numeric($numbers[0]) and is_numeric($numbers[1]) and ($numbers[1]!=0)) {
+            return $numbers[0]/$numbers[1];
+        }
+    }
+    if (is_numeric($string)) {
+        return $string;
+    }
+    return 0;
+}
+
+function drop_zero_fraction($value, $decimals) {
+    if($value == round($value)){
+        return number_format($value, 0);
+    }
+    return number_format($value, $decimals);
 }
 
 /**
@@ -3956,13 +4016,13 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         @keyframes fadeout { from { bottom:30px;opacity:1; }
         to { bottom:0;opacity:0; }
         }
-        #main-table span.badge { border-bottom:2px solid #f8f9fa }
-        #main-table span.badge:nth-child(1) { border-color:#df4227 }
-        #main-table span.badge:nth-child(2) { border-color:#f8b600 }
-        #main-table span.badge:nth-child(3) { border-color:#00bd60 }
-        #main-table span.badge:nth-child(4) { border-color:#4581ff }
-        #main-table span.badge:nth-child(5) { border-color:#ac68fc }
-        #main-table span.badge:nth-child(6) { border-color:#45c3d2 }
+        span.badge { border-bottom:2px solid #f8f9fa }
+        span.badge:nth-child(1) { border-color:#df4227 }
+        span.badge:nth-child(2) { border-color:#f8b600 }
+        span.badge:nth-child(3) { border-color:#00bd60 }
+        span.badge:nth-child(4) { border-color:#4581ff }
+        span.badge:nth-child(5) { border-color:#ac68fc }
+        span.badge:nth-child(6) { border-color:#45c3d2 }
         @media only screen and (min-device-width:768px) and (max-device-width:1024px) and (orientation:landscape) and (-webkit-min-device-pixel-ratio:2) { .navbar-collapse .col-xs-6 { padding:0; }
         }
         .btn.active.focus,.btn.active:focus,.btn.focus,.btn.focus:active,.btn:active:focus,.btn:focus { outline:0!important;outline-offset:0!important;background-image:none!important;-webkit-box-shadow:none!important;box-shadow:none!important }
