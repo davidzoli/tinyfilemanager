@@ -60,7 +60,10 @@ $default_timezone = 'Etc/UTC'; // UTC
 
 // Root path for file manager
 // use absolute path of directory i.e: '/var/www/folder' or $_SERVER['DOCUMENT_ROOT'].'/folder'
-$root_path = $_SERVER['DOCUMENT_ROOT'];
+$root_path = $_SERVER['DOCUMENT_ROOT'] . '/filemanagerTest';
+
+// Folder for thumbnail generation
+$thumb_folder = '/_thumbs';
 
 // Root url for links in file manager.Relative to $http_host. Variants: '', 'path/to/subfolder'
 // Will not working if $root_path will be outside of server document root
@@ -68,7 +71,7 @@ $root_url = '';
 
 // Server hostname. Can set manually if wrong
 // $_SERVER['HTTP_HOST'].'/folder'
-$http_host = $_SERVER['HTTP_HOST'];
+$http_host = $_SERVER['HTTP_HOST'] . '/filemanagerTest';
 
 // input encoding for iconv
 $iconv_input_encoding = 'UTF-8';
@@ -98,7 +101,9 @@ $favicon_path = '';
 
 // Files and folders to excluded from listing
 // e.g. array('myfile.html', 'personal-folder', '*.php', ...)
-$exclude_items = array();
+$exclude_items = array(
+    $thumb_folder
+);
 
 // Online office Docs Viewer
 // Availabe rules are 'google', 'microsoft' or false
@@ -274,7 +279,7 @@ defined('FM_SELF_URL') || define('FM_SELF_URL', ($is_https ? 'https' : 'http') .
 // logout
 if (isset($_GET['logout'])) {
     unset($_SESSION[FM_SESSION_ID]['logged']);
-    unset( $_SESSION['token']); 
+    unset( $_SESSION['token']);
     fm_redirect(FM_SELF_URL);
 }
 
@@ -419,6 +424,7 @@ if (!@is_dir($root_path)) {
 
 defined('FM_SHOW_HIDDEN') || define('FM_SHOW_HIDDEN', $show_hidden_files);
 defined('FM_ROOT_PATH') || define('FM_ROOT_PATH', $root_path);
+defined('FM_THUMB_FOLDER') || define('FM_THUMB_FOLDER', $thumb_folder);
 defined('FM_LANG') || define('FM_LANG', $lang);
 defined('FM_FILE_EXTENSION') || define('FM_FILE_EXTENSION', $allowed_file_extensions);
 defined('FM_UPLOAD_EXTENSION') || define('FM_UPLOAD_EXTENSION', $allowed_upload_extensions);
@@ -798,7 +804,7 @@ if (isset($_POST['file'], $_POST['copy_to'], $_POST['finish'], $_POST['token']) 
     if(!verifyToken($_POST['token'])) {
         fm_set_msg(lng('Invalid Token.'), 'error');
     }
-    
+
     // from
     $path = FM_ROOT_PATH;
     if (FM_PATH != '') {
@@ -1117,9 +1123,9 @@ if (isset($_POST['group'], $_POST['token']) && (isset($_POST['zip']) || isset($_
     foreach($files as $file){
         array_push($sanitized_files, fm_clean_path($file));
     }
-    
+
     $files = $sanitized_files;
-    
+
     if (!empty($files)) {
         chdir($path);
 
@@ -1225,7 +1231,7 @@ if (isset($_POST['chmod'], $_POST['token']) && !FM_READONLY && !FM_IS_WIN) {
     if(!verifyToken($_POST['token'])) {
         fm_set_msg(lng("Invalid Token."), 'error');
     }
-    
+
     $path = FM_ROOT_PATH;
     if (FM_PATH != '') {
         $path .= '/' . FM_PATH;
@@ -1448,7 +1454,7 @@ if (isset($_POST['copy']) && !FM_READONLY) {
                     <p>
                         <b><a href="?p=<?php echo urlencode(FM_PATH) ?>" class="btn btn-outline-danger"><i class="fa fa-times-circle"></i> <?php echo lng('Cancel') ?></a></b>&nbsp;
                         <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>">
-                        <button type="submit" class="btn btn-success"><i class="fa fa-check-circle"></i> <?php echo lng('Copy') ?></button> 
+                        <button type="submit" class="btn btn-success"><i class="fa fa-check-circle"></i> <?php echo lng('Copy') ?></button>
                     </p>
                 </form>
             </div>
@@ -1997,7 +2003,7 @@ if (isset($_GET['chmod']) && !FM_READONLY && !FM_IS_WIN) {
                     </table>
 
                     <p>
-                       <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>"> 
+                       <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>">
                         <b><a href="?p=<?php echo urlencode(FM_PATH) ?>" class="btn btn-outline-primary"><i class="fa fa-times-circle"></i> <?php echo lng('Cancel') ?></a></b>&nbsp;
                         <button type="submit" class="btn btn-success"><i class="fa fa-check-circle"></i> <?php echo lng('Change') ?></button>
                     </p>
@@ -2158,7 +2164,7 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                         <div class="filename">
                         <?php
                            if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))): ?>
-                                <?php $imagePreview = fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f); ?>
+                                <?php $imagePreview = fm_get_thumbnail(fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f), FM_PATH, $f); ?>
                                 <a href="<?php echo $filelink ?>" data-preview-image="<?php echo $imagePreview ?>" title="<?php echo fm_enc($f) ?>">
                            <?php else: ?>
                                 <a href="<?php echo $filelink ?>" title="<?php echo $f ?>">
@@ -2268,9 +2274,9 @@ function print_external($key) {
  * @param string $token
  * @return bool
  */
-function verifyToken($token) 
+function verifyToken($token)
 {
-    if (hash_equals($_SESSION['token'], $token)) { 
+    if (hash_equals($_SESSION['token'], $token)) {
         return true;
     }
     return false;
@@ -3134,6 +3140,29 @@ function fm_get_file_mimes($extension)
       $fileTypes[$extension] = ['application/octet-stream'];
     }
     return $fileTypes[$extension];
+}
+
+function fm_get_thumbnail($file, $p, $f) {
+    $thumbWidth = 160;
+    $destImageFolder = FM_ROOT_PATH.FM_THUMB_FOLDER.'/'.$p;
+    if (!file_exists($destImageFolder)) {
+        mkdir($destImageFolder);
+    }
+    $destImagePath = $destImageFolder.'/'.$f;
+    if (!file_exists($destImagePath)) {
+        $sourceImage = imagecreatefromjpeg($file);
+        $orgWidth = imagesx($sourceImage);
+        $orgHeight = imagesy($sourceImage);
+        $thumbHeight = floor($orgHeight * ($thumbWidth / $orgWidth));
+        $destImage = imagecreatetruecolor($thumbWidth, $thumbHeight);
+        imagecopyresampled($destImage, $sourceImage, 0, 0, 0, 0, $thumbWidth, $thumbHeight, $orgWidth, $orgHeight);
+        imagejpeg($destImage, $destImagePath);
+        imagedestroy($sourceImage);
+        imagedestroy($destImage);
+    }
+    $thumbUrl = FM_ROOT_URL.FM_THUMB_FOLDER.'/'.$p.'/'.$f;
+    // var_dump($thumbUrl);
+    return $thumbUrl;
 }
 
 /**
@@ -4128,7 +4157,7 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         $confirmDailog.modal('show');
         return false;
     }
-    
+
 
     // on mouse hover image preview
     !function(s){s.previewImage=function(e){var o=s(document),t=".previewImage",a=s.extend({xOffset:20,yOffset:-20,fadeIn:"fast",css:{padding:"5px",border:"1px solid #cccccc","background-color":"#fff"},eventSelector:"[data-preview-image]",dataKey:"previewImage",overlayId:"preview-image-plugin-overlay"},e);return o.off(t),o.on("mouseover"+t,a.eventSelector,function(e){s("p#"+a.overlayId).remove();var o=s("<p>").attr("id",a.overlayId).css("position","absolute").css("display","none").append(s('<img class="c-preview-img">').attr("src",s(this).data(a.dataKey)));a.css&&o.css(a.css),s("body").append(o),o.css("top",e.pageY+a.yOffset+"px").css("left",e.pageX+a.xOffset+"px").fadeIn(a.fadeIn)}),o.on("mouseout"+t,a.eventSelector,function(){s("#"+a.overlayId).remove()}),o.on("mousemove"+t,a.eventSelector,function(e){s("#"+a.overlayId).css("top",e.pageY+a.yOffset+"px").css("left",e.pageX+a.xOffset+"px")}),this},s.previewImage()}(jQuery);
@@ -4158,7 +4187,7 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
     });
 </script>
 <?php if (isset($_GET['edit']) && isset($_GET['env']) && FM_EDIT_FILE && !FM_READONLY):
-        
+
         $ext = pathinfo($_GET["edit"], PATHINFO_EXTENSION);
         $ext =  $ext == "js" ? "javascript" :  $ext;
         ?>
@@ -4255,11 +4284,11 @@ function lng($txt) {
     $tr['en']['NormalEditor']   = 'Normal Editor';          $tr['en']['BackUp']             = 'Back Up';
     $tr['en']['SourceFolder']   = 'Source Folder';          $tr['en']['Files']              = 'Files';
     $tr['en']['Move']           = 'Move';                   $tr['en']['Change']             = 'Change';
-    $tr['en']['Settings']       = 'Settings';               $tr['en']['Language']           = 'Language';        
+    $tr['en']['Settings']       = 'Settings';               $tr['en']['Language']           = 'Language';
     $tr['en']['ErrorReporting'] = 'Error Reporting';        $tr['en']['ShowHiddenFiles']    = 'Show Hidden Files';
     $tr['en']['Help']           = 'Help';                   $tr['en']['Created']            = 'Created';
     $tr['en']['Help Documents'] = 'Help Documents';         $tr['en']['Report Issue']       = 'Report Issue';
-    $tr['en']['Generate']       = 'Generate';               $tr['en']['FullSize']           = 'Full Size';              
+    $tr['en']['Generate']       = 'Generate';               $tr['en']['FullSize']           = 'Full Size';
     $tr['en']['HideColumns']    = 'Hide Perms/Owner columns';$tr['en']['You are logged in'] = 'You are logged in';
     $tr['en']['Nothing selected']   = 'Nothing selected';   $tr['en']['Paths must be not equal']    = 'Paths must be not equal';
     $tr['en']['Renamed from']       = 'Renamed from';       $tr['en']['Archive not unpacked']       = 'Archive not unpacked';
