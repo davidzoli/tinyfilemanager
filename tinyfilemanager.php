@@ -1283,6 +1283,18 @@ if (isset($_POST['chmod'], $_POST['token']) && !FM_READONLY && !FM_IS_WIN) {
     $FM_PATH=FM_PATH; fm_redirect(FM_SELF_URL . '?p=' . urlencode($FM_PATH));
 }
 
+if (!isset($_SESSION['view'])) {
+    $_SESSION['view'] = 'list';
+}
+
+if (isset($_POST['list'])) {
+    $_SESSION['view'] = 'list';
+}
+
+if (isset($_POST['grid'])) {
+    $_SESSION['view'] = 'grid';
+}
+
 /*************************** ACTIONS ***************************/
 
 // get current path
@@ -2032,210 +2044,293 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
     <input type="hidden" name="p" value="<?php echo fm_enc(FM_PATH) ?>">
     <input type="hidden" name="group" value="1">
     <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>">
-    <div class="table-responsive">
-        <table class="table table-bordered table-hover table-sm <?php echo $tableTheme; ?>" id="main-table">
-            <thead class="thead-white">
-            <tr>
-                <?php if (!FM_READONLY): ?>
-                    <th style="width:3%" class="custom-checkbox-header">
-                        <div class="custom-control custom-checkbox">
-                            <input type="checkbox" class="custom-control-input" id="js-select-all-items" onclick="checkbox_toggle()">
-                            <label class="custom-control-label" for="js-select-all-items"></label>
-                        </div>
-                    </th><?php endif; ?>
-                <th><?php echo lng('Name') ?></th>
-                <th><?php echo lng('Size') ?></th>
-                <th><?php echo lng('Modified') ?></th>
-                <?php if (!FM_IS_WIN && !$hide_Cols): ?>
-                    <th><?php echo lng('Perms') ?></th>
-                    <th><?php echo lng('Owner') ?></th><?php endif; ?>
-                <th><?php echo lng('Actions') ?></th>
-            </tr>
-            </thead>
-            <?php
-            // link to parent folder
-            if ($parent !== false) {
-                ?>
-                <tr><?php if (!FM_READONLY): ?>
-                    <td class="nosort"></td><?php endif; ?>
-                    <td class="border-0" data-sort><a href="?p=<?php echo urlencode($parent) ?>"><i class="fa fa-chevron-circle-left go-back"></i> ..</a></td>
-                    <td class="border-0" data-order></td>
-                    <td class="border-0" data-order></td>
-                    <td class="border-0"></td>
-                    <?php if (!FM_IS_WIN && !$hide_Cols) { ?>
-                        <td class="border-0"></td>
-                        <td class="border-0"></td>
-                    <?php } ?>
+    <?php if ($_SESSION['view'] == 'list') { ?>
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-sm <?php echo $tableTheme; ?>" id="main-table">
+                <thead class="thead-white">
+                <tr>
+                    <?php if (!FM_READONLY): ?>
+                        <th style="width:3%" class="custom-checkbox-header">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="js-select-all-items" onclick="checkbox_toggle()">
+                                <label class="custom-control-label" for="js-select-all-items"></label>
+                            </div>
+                        </th><?php endif; ?>
+                    <th><?php echo lng('Name') ?></th>
+                    <th><?php echo lng('Size') ?></th>
+                    <th><?php echo lng('Modified') ?></th>
+                    <?php if (!FM_IS_WIN && !$hide_Cols): ?>
+                        <th><?php echo lng('Perms') ?></th>
+                        <th><?php echo lng('Owner') ?></th><?php endif; ?>
+                    <th><?php echo lng('Actions') ?></th>
                 </tr>
+                </thead>
                 <?php
-            }
-            $ii = 3399;
+                // link to parent folder
+                if ($parent !== false) {
+                    ?>
+                    <tr><?php if (!FM_READONLY): ?>
+                        <td class="nosort"></td><?php endif; ?>
+                        <td class="border-0" data-sort><a href="?p=<?php echo urlencode($parent) ?>"><i class="fa fa-chevron-circle-left go-back"></i> ..</a></td>
+                        <td class="border-0" data-order></td>
+                        <td class="border-0" data-order></td>
+                        <td class="border-0"></td>
+                        <?php if (!FM_IS_WIN && !$hide_Cols) { ?>
+                            <td class="border-0"></td>
+                            <td class="border-0"></td>
+                        <?php } ?>
+                    </tr>
+                    <?php
+                }
+                $ii = 3399;
+                foreach ($folders as $f) {
+                    $is_link = is_link($path . '/' . $f);
+                    $img = $is_link ? 'icon-link_folder' : 'fa fa-folder-o';
+                    $modif_raw = filemtime($path . '/' . $f);
+                    $modif = date(FM_DATETIME_FORMAT, $modif_raw);
+                    $date_sorting = strtotime(date("F d Y H:i:s.", $modif_raw));
+                    $filesize_raw = "";
+                    $filesize = lng('Folder');
+                    $perms = substr(decoct(fileperms($path . '/' . $f)), -4);
+                    if (function_exists('posix_getpwuid') && function_exists('posix_getgrgid')) {
+                        $owner = posix_getpwuid(fileowner($path . '/' . $f));
+                        $group = posix_getgrgid(filegroup($path . '/' . $f));
+                        if ($owner === false) {
+                            $owner = array('name' => '?');
+                        }
+                        if ($group === false) {
+                            $group = array('name' => '?');
+                        }
+                    } else {
+                        $owner = array('name' => '?');
+                        $group = array('name' => '?');
+                    }
+                    ?>
+                    <tr>
+                        <?php if (!FM_READONLY): ?>
+                            <td class="custom-checkbox-td">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="<?php echo $ii ?>" name="file[]" value="<?php echo fm_enc($f) ?>">
+                                <label class="custom-control-label" for="<?php echo $ii ?>"></label>
+                            </div>
+                            </td><?php endif; ?>
+                        <td data-sort=<?php echo fm_convert_win(fm_enc($f)) ?>>
+                            <div class="filename"><a href="?p=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>"><i class="<?php echo $img ?>"></i> <?php echo fm_convert_win(fm_enc($f)) ?>
+                                </a><?php echo($is_link ? ' &rarr; <i>' . readlink($path . '/' . $f) . '</i>' : '') ?></div>
+                        </td>
+                        <td data-order="a-<?php echo str_pad($filesize_raw, 18, "0", STR_PAD_LEFT);?>">
+                            <?php echo $filesize; ?>
+                        </td>
+                        <td data-order="a-<?php echo $date_sorting;?>"><?php echo $modif ?></td>
+                        <?php if (!FM_IS_WIN && !$hide_Cols): ?>
+                            <td><?php if (!FM_READONLY): ?><a title="Change Permissions" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;chmod=<?php echo urlencode($f) ?>"><?php echo $perms ?></a><?php else: ?><?php echo $perms ?><?php endif; ?>
+                            </td>
+                            <td><?php echo $owner['name'] . ':' . $group['name'] ?></td>
+                        <?php endif; ?>
+                        <td class="inline-actions"><?php if (!FM_READONLY): ?>
+                                <a title="<?php echo lng('Delete')?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>" onclick="confirmDailog(event, '1028','<?php echo lng('Delete').' '.lng('Folder'); ?>','<?php echo urlencode($f) ?>', this.href);"> <i class="fa fa-trash-o" aria-hidden="true"></i></a>
+                                <a title="<?php echo lng('Rename')?>" href="#" onclick="rename('<?php echo fm_enc(addslashes(FM_PATH)) ?>', '<?php echo fm_enc(addslashes($f)) ?>');return false;"><i class="fa fa-pencil-square-o" aria-hidden="true"></i></a>
+                                <a title="<?php echo lng('CopyTo')?>..." href="?p=&amp;copy=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>"><i class="fa fa-files-o" aria-hidden="true"></i></a>
+                            <?php endif; ?>
+                            <a title="<?php echo lng('DirectLink')?>" href="<?php echo fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f . '/') ?>" target="_blank"><i class="fa fa-link" aria-hidden="true"></i></a>
+                        </td>
+                    </tr>
+                    <?php
+                    flush();
+                    $ii++;
+                }
+                $ik = 6070;
+                foreach ($files as $f) {
+                    $is_link = is_link($path . '/' . $f);
+                    $img = $is_link ? 'fa fa-file-text-o' : fm_get_file_icon_class($path . '/' . $f);
+                    $modif_raw = filemtime($path . '/' . $f);
+                    $modif = date(FM_DATETIME_FORMAT, $modif_raw);
+                    $date_sorting = strtotime(date("F d Y H:i:s.", $modif_raw));
+                    $filesize_raw = fm_get_size($path . '/' . $f);
+                    $filesize = fm_get_filesize($filesize_raw);
+                    $filelink = '?p=' . urlencode(FM_PATH) . '&amp;view=' . urlencode($f);
+                    $all_files_size += $filesize_raw;
+                    $perms = substr(decoct(fileperms($path . '/' . $f)), -4);
+                    if (function_exists('posix_getpwuid') && function_exists('posix_getgrgid')) {
+                        $owner = posix_getpwuid(fileowner($path . '/' . $f));
+                        $group = posix_getgrgid(filegroup($path . '/' . $f));
+                        if ($owner === false) {
+                            $owner = array('name' => '?');
+                        }
+                        if ($group === false) {
+                            $group = array('name' => '?');
+                        }
+                    } else {
+                        $owner = array('name' => '?');
+                        $group = array('name' => '?');
+                    }
+                    ?>
+                    <tr>
+                        <?php if (!FM_READONLY): ?>
+                            <td class="custom-checkbox-td">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="<?php echo $ik ?>" name="file[]" value="<?php echo fm_enc($f) ?>">
+                                <label class="custom-control-label" for="<?php echo $ik ?>"></label>
+                            </div>
+                            </td><?php endif; ?>
+                        <td data-sort=<?php echo fm_enc($f) ?>>
+                            <div class="filename">
+                            <?php
+                            if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))): ?>
+                                    <?php $imagePreview = fm_get_thumbnail(fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f), FM_PATH, $f); ?>
+                                    <a href="<?php echo $filelink ?>" data-preview-image="<?php echo $imagePreview ?>" title="<?php echo fm_enc($f) ?>">
+                            <?php else: ?>
+                                    <a href="<?php echo $filelink ?>" title="<?php echo $f ?>">
+                                <?php endif; ?>
+                                        <i class="<?php echo $img ?>"></i> <?php echo fm_convert_win(fm_enc($f)) ?>
+                                    </a>
+                                    <?php echo($is_link ? ' &rarr; <i>' . readlink($path . '/' . $f) . '</i>' : '') ?>
+                            </div>
+                        </td>
+                        <td data-order="b-<?php echo str_pad($filesize_raw, 18, "0", STR_PAD_LEFT); ?>"><span title="<?php printf('%s bytes', $filesize_raw) ?>">
+                            <?php echo $filesize; ?>
+                            </span></td>
+                        <td data-order="b-<?php echo $date_sorting;?>"><?php echo $modif ?></td>
+                        <?php if (!FM_IS_WIN && !$hide_Cols): ?>
+                            <td><?php if (!FM_READONLY): ?><a title="<?php echo 'Change Permissions' ?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;chmod=<?php echo urlencode($f) ?>"><?php echo $perms ?></a><?php else: ?><?php echo $perms ?><?php endif; ?>
+                            </td>
+                            <td><?php echo fm_enc($owner['name'] . ':' . $group['name']) ?></td>
+                        <?php endif; ?>
+                        <td class="inline-actions">
+                            <?php if (!FM_READONLY): ?>
+                                <a title="<?php echo lng('Delete') ?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>" onclick="confirmDailog(event, 1209, '<?php echo lng('Delete').' '.lng('File'); ?>','<?php echo urlencode($f); ?>', this.href);"> <i class="fa fa-trash-o"></i></a>
+                                <a title="<?php echo lng('Rename') ?>" href="#" onclick="rename('<?php echo fm_enc(addslashes(FM_PATH)) ?>', '<?php echo fm_enc(addslashes($f)) ?>');return false;"><i class="fa fa-pencil-square-o"></i></a>
+                                <a title="<?php echo lng('CopyTo') ?>..."
+                                href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>"><i class="fa fa-files-o"></i></a>
+                            <?php endif; ?>
+                            <a title="<?php echo lng('DirectLink') ?>" href="<?php echo fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f) ?>" target="_blank"><i class="fa fa-link"></i></a>
+                            <a title="<?php echo lng('Download') ?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;dl=<?php echo urlencode($f) ?>" onclick="confirmDailog(event, 1211, '<?php echo lng('Download'); ?>','<?php echo urlencode($f); ?>', this.href);"><i class="fa fa-download"></i></a>
+                        </td>
+                    </tr>
+                    <?php
+                    flush();
+                    $ik++;
+                }
+
+                if (empty($folders) && empty($files)) { ?>
+                    <tfoot>
+                        <tr><?php if (!FM_READONLY): ?>
+                                <td></td><?php endif; ?>
+                            <td colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? '6' : '4' ?>"><em><?php echo lng('Folder is empty') ?></em></td>
+                        </tr>
+                    </tfoot>
+                    <?php
+                } else { ?>
+                    <tfoot>
+                        <tr>
+                            <td class="gray" colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? (FM_READONLY ? '6' :'7') : (FM_READONLY ? '4' : '5') ?>">
+                                <?php echo lng('FullSize').': <span class="badge text-bg-light border-radius-0">'.fm_get_filesize($all_files_size).'</span>' ?>
+                                <?php echo lng('File').': <span class="badge text-bg-light border-radius-0">'.$num_files.'</span>' ?>
+                                <?php echo lng('Folder').': <span class="badge text-bg-light border-radius-0">'.$num_folders.'</span>' ?>
+                            </td>
+                        </tr>
+                    </tfoot>
+                    <?php } ?>
+            </table>
+        </div>
+    <?php } else { ?>
+        <div class="row">
+            <?php if ($parent !== false) { ?>
+                <div class="col-sm-3 mb-4">
+                    <a href="?p=<?php echo urlencode($parent) ?>">
+                        <div class="card text-center grid-card">
+                            <div class="p-2 grid-card-top">
+                                <i class="fa fa-chevron-circle-left go-back" style="font-size:5rem;"></i>
+                            </div>
+                            <div class="p-2 pt-0 grid-card-bottom">
+                                <p class="card-text">
+                                    ..
+                                </p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            <?php } ?>
+
+            <?php
             foreach ($folders as $f) {
                 $is_link = is_link($path . '/' . $f);
                 $img = $is_link ? 'icon-link_folder' : 'fa fa-folder-o';
-                $modif_raw = filemtime($path . '/' . $f);
-                $modif = date(FM_DATETIME_FORMAT, $modif_raw);
-                $date_sorting = strtotime(date("F d Y H:i:s.", $modif_raw));
-                $filesize_raw = "";
-                $filesize = lng('Folder');
-                $perms = substr(decoct(fileperms($path . '/' . $f)), -4);
-                if (function_exists('posix_getpwuid') && function_exists('posix_getgrgid')) {
-                    $owner = posix_getpwuid(fileowner($path . '/' . $f));
-                    $group = posix_getgrgid(filegroup($path . '/' . $f));
-                    if ($owner === false) {
-                        $owner = array('name' => '?');
-                    }
-                    if ($group === false) {
-                        $group = array('name' => '?');
-                    }
-                } else {
-                    $owner = array('name' => '?');
-                    $group = array('name' => '?');
-                }
-                ?>
-                <tr>
-                    <?php if (!FM_READONLY): ?>
-                        <td class="custom-checkbox-td">
-                        <div class="custom-control custom-checkbox">
-                            <input type="checkbox" class="custom-control-input" id="<?php echo $ii ?>" name="file[]" value="<?php echo fm_enc($f) ?>">
-                            <label class="custom-control-label" for="<?php echo $ii ?>"></label>
-                        </div>
-                        </td><?php endif; ?>
-                    <td data-sort=<?php echo fm_convert_win(fm_enc($f)) ?>>
-                        <div class="filename"><a href="?p=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>"><i class="<?php echo $img ?>"></i> <?php echo fm_convert_win(fm_enc($f)) ?>
-                            </a><?php echo($is_link ? ' &rarr; <i>' . readlink($path . '/' . $f) . '</i>' : '') ?></div>
-                    </td>
-                    <td data-order="a-<?php echo str_pad($filesize_raw, 18, "0", STR_PAD_LEFT);?>">
-                        <?php echo $filesize; ?>
-                    </td>
-                    <td data-order="a-<?php echo $date_sorting;?>"><?php echo $modif ?></td>
-                    <?php if (!FM_IS_WIN && !$hide_Cols): ?>
-                        <td><?php if (!FM_READONLY): ?><a title="Change Permissions" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;chmod=<?php echo urlencode($f) ?>"><?php echo $perms ?></a><?php else: ?><?php echo $perms ?><?php endif; ?>
-                        </td>
-                        <td><?php echo $owner['name'] . ':' . $group['name'] ?></td>
-                    <?php endif; ?>
-                    <td class="inline-actions"><?php if (!FM_READONLY): ?>
-                            <a title="<?php echo lng('Delete')?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>" onclick="confirmDailog(event, '1028','<?php echo lng('Delete').' '.lng('Folder'); ?>','<?php echo urlencode($f) ?>', this.href);"> <i class="fa fa-trash-o" aria-hidden="true"></i></a>
-                            <a title="<?php echo lng('Rename')?>" href="#" onclick="rename('<?php echo fm_enc(addslashes(FM_PATH)) ?>', '<?php echo fm_enc(addslashes($f)) ?>');return false;"><i class="fa fa-pencil-square-o" aria-hidden="true"></i></a>
-                            <a title="<?php echo lng('CopyTo')?>..." href="?p=&amp;copy=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>"><i class="fa fa-files-o" aria-hidden="true"></i></a>
-                        <?php endif; ?>
-                        <a title="<?php echo lng('DirectLink')?>" href="<?php echo fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f . '/') ?>" target="_blank"><i class="fa fa-link" aria-hidden="true"></i></a>
-                    </td>
-                </tr>
-                <?php
-                flush();
-                $ii++;
-            }
-            $ik = 6070;
-            foreach ($files as $f) {
-                $is_link = is_link($path . '/' . $f);
-                $img = $is_link ? 'fa fa-file-text-o' : fm_get_file_icon_class($path . '/' . $f);
-                $modif_raw = filemtime($path . '/' . $f);
-                $modif = date(FM_DATETIME_FORMAT, $modif_raw);
-                $date_sorting = strtotime(date("F d Y H:i:s.", $modif_raw));
-                $filesize_raw = fm_get_size($path . '/' . $f);
-                $filesize = fm_get_filesize($filesize_raw);
-                $filelink = '?p=' . urlencode(FM_PATH) . '&amp;view=' . urlencode($f);
-                $all_files_size += $filesize_raw;
-                $perms = substr(decoct(fileperms($path . '/' . $f)), -4);
-                if (function_exists('posix_getpwuid') && function_exists('posix_getgrgid')) {
-                    $owner = posix_getpwuid(fileowner($path . '/' . $f));
-                    $group = posix_getgrgid(filegroup($path . '/' . $f));
-                    if ($owner === false) {
-                        $owner = array('name' => '?');
-                    }
-                    if ($group === false) {
-                        $group = array('name' => '?');
-                    }
-                } else {
-                    $owner = array('name' => '?');
-                    $group = array('name' => '?');
-                }
-                ?>
-                <tr>
-                    <?php if (!FM_READONLY): ?>
-                        <td class="custom-checkbox-td">
-                        <div class="custom-control custom-checkbox">
-                            <input type="checkbox" class="custom-control-input" id="<?php echo $ik ?>" name="file[]" value="<?php echo fm_enc($f) ?>">
-                            <label class="custom-control-label" for="<?php echo $ik ?>"></label>
-                        </div>
-                        </td><?php endif; ?>
-                    <td data-sort=<?php echo fm_enc($f) ?>>
-                        <div class="filename">
-                        <?php
-                           if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))): ?>
-                                <?php $imagePreview = fm_get_thumbnail(fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f), FM_PATH, $f); ?>
-                                <a href="<?php echo $filelink ?>" data-preview-image="<?php echo $imagePreview ?>" title="<?php echo fm_enc($f) ?>">
-                           <?php else: ?>
-                                <a href="<?php echo $filelink ?>" title="<?php echo $f ?>">
-                            <?php endif; ?>
-                                    <i class="<?php echo $img ?>"></i> <?php echo fm_convert_win(fm_enc($f)) ?>
-                                </a>
-                                <?php echo($is_link ? ' &rarr; <i>' . readlink($path . '/' . $f) . '</i>' : '') ?>
-                        </div>
-                    </td>
-                    <td data-order="b-<?php echo str_pad($filesize_raw, 18, "0", STR_PAD_LEFT); ?>"><span title="<?php printf('%s bytes', $filesize_raw) ?>">
-                        <?php echo $filesize; ?>
-                        </span></td>
-                    <td data-order="b-<?php echo $date_sorting;?>"><?php echo $modif ?></td>
-                    <?php if (!FM_IS_WIN && !$hide_Cols): ?>
-                        <td><?php if (!FM_READONLY): ?><a title="<?php echo 'Change Permissions' ?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;chmod=<?php echo urlencode($f) ?>"><?php echo $perms ?></a><?php else: ?><?php echo $perms ?><?php endif; ?>
-                        </td>
-                        <td><?php echo fm_enc($owner['name'] . ':' . $group['name']) ?></td>
-                    <?php endif; ?>
-                    <td class="inline-actions">
-                        <?php if (!FM_READONLY): ?>
-                            <a title="<?php echo lng('Delete') ?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>" onclick="confirmDailog(event, 1209, '<?php echo lng('Delete').' '.lng('File'); ?>','<?php echo urlencode($f); ?>', this.href);"> <i class="fa fa-trash-o"></i></a>
-                            <a title="<?php echo lng('Rename') ?>" href="#" onclick="rename('<?php echo fm_enc(addslashes(FM_PATH)) ?>', '<?php echo fm_enc(addslashes($f)) ?>');return false;"><i class="fa fa-pencil-square-o"></i></a>
-                            <a title="<?php echo lng('CopyTo') ?>..."
-                               href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>"><i class="fa fa-files-o"></i></a>
-                        <?php endif; ?>
-                        <a title="<?php echo lng('DirectLink') ?>" href="<?php echo fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f) ?>" target="_blank"><i class="fa fa-link"></i></a>
-                        <a title="<?php echo lng('Download') ?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;dl=<?php echo urlencode($f) ?>" onclick="confirmDailog(event, 1211, '<?php echo lng('Download'); ?>','<?php echo urlencode($f); ?>', this.href);"><i class="fa fa-download"></i></a>
-                    </td>
-                </tr>
-                <?php
-                flush();
-                $ik++;
-            }
+            ?>
 
-            if (empty($folders) && empty($files)) { ?>
-                <tfoot>
-                    <tr><?php if (!FM_READONLY): ?>
-                            <td></td><?php endif; ?>
-                        <td colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? '6' : '4' ?>"><em><?php echo lng('Folder is empty') ?></em></td>
-                    </tr>
-                </tfoot>
-                <?php
-            } else { ?>
-                <tfoot>
-                    <tr>
-                        <td class="gray" colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? (FM_READONLY ? '6' :'7') : (FM_READONLY ? '4' : '5') ?>">
-                            <?php echo lng('FullSize').': <span class="badge text-bg-light border-radius-0">'.fm_get_filesize($all_files_size).'</span>' ?>
-                            <?php echo lng('File').': <span class="badge text-bg-light border-radius-0">'.$num_files.'</span>' ?>
-                            <?php echo lng('Folder').': <span class="badge text-bg-light border-radius-0">'.$num_folders.'</span>' ?>
-                        </td>
-                    </tr>
-                </tfoot>
-                <?php } ?>
-        </table>
-    </div>
+                <div class="col-sm-3 mb-4">
+                    <a href="?p=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>">
+                        <div class="card text-center grid-card">
+                            <div class="p-2 grid-card-top">
+                                <i class="<?php echo $img ?>" style="font-size:5rem;"></i>
+                            </div>
+                            <div class="p-2 pt-0 grid-card-bottom">
+                                <p class="card-text">
+                                    <?php echo fm_convert_win(fm_enc($f)) ?> <br>
+                                    <?php echo($is_link ? ' &rarr; <i>' . readlink($path . '/' . $f) . '</i>' : '') ?>
+                                </p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            <?php } ?>
+
+            <?php
+            foreach ($files as $f) {
+                    $is_link = is_link($path . '/' . $f);
+                    $img = $is_link ? 'fa fa-file-text-o' : fm_get_file_icon_class($path . '/' . $f);
+                    $filelink = '?p=' . urlencode(FM_PATH) . '&amp;view=' . urlencode($f);
+            ?>
+                <div class="col-sm-3 mb-4">
+                    <a href="<?php echo $filelink ?>">
+                        <div class="card text-center grid-card">
+                            <?php
+                            if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))) {
+                                $imagePreview = fm_get_thumbnail(fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f), FM_PATH, $f);
+                            ?>
+                                <div class="p-2" style="height: 11rem;">
+                                    <img class="img-fluid rounded" src="<?php echo $imagePreview; ?>" alt="">
+                                </div>
+                            <?php } else {?>
+                                <div class="p-2 grid-card-top">
+                                    <i class="<?php echo $img ?>" style="font-size:5rem;"></i>
+                                </div>
+                            <?php }?>
+                            <div class="p-2 pt-0 grid-card-bottom">
+                                <p class="card-text">
+                                    <?php echo fm_convert_win(fm_enc($f)) ?> <br>
+                                    <?php echo($is_link ? ' &rarr; <i>' . readlink($path . '/' . $f) . '</i>' : '') ?>
+                                </p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            <?php }?>
+        </div>
+    <?php } ?>
 
     <div class="row">
         <?php if (!FM_READONLY): ?>
         <div class="col-xs-12 col-sm-9">
             <ul class="list-inline footer-action">
-                <li class="list-inline-item"> <a href="#/select-all" class="btn btn-small btn-outline-primary btn-2" onclick="select_all();return false;"><i class="fa fa-check-square"></i> <?php echo lng('SelectAll') ?> </a></li>
-                <li class="list-inline-item"><a href="#/unselect-all" class="btn btn-small btn-outline-primary btn-2" onclick="unselect_all();return false;"><i class="fa fa-window-close"></i> <?php echo lng('UnSelectAll') ?> </a></li>
-                <li class="list-inline-item"><a href="#/invert-all" class="btn btn-small btn-outline-primary btn-2" onclick="invert_all();return false;"><i class="fa fa-th-list"></i> <?php echo lng('InvertSelection') ?> </a></li>
-                <li class="list-inline-item"><input type="submit" class="hidden" name="delete" id="a-delete" value="Delete" onclick="return confirm('<?php echo lng('Delete selected files and folders?'); ?>')">
-                    <a href="javascript:document.getElementById('a-delete').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-trash"></i> <?php echo lng('Delete') ?> </a></li>
-                <li class="list-inline-item"><input type="submit" class="hidden" name="zip" id="a-zip" value="zip" onclick="return confirm('<?php echo lng('Create archive?'); ?>')">
-                    <a href="javascript:document.getElementById('a-zip').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-file-archive-o"></i> <?php echo lng('Zip') ?> </a></li>
-                <li class="list-inline-item"><input type="submit" class="hidden" name="tar" id="a-tar" value="tar" onclick="return confirm('<?php echo lng('Create archive?'); ?>')">
-                    <a href="javascript:document.getElementById('a-tar').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-file-archive-o"></i> <?php echo lng('Tar') ?> </a></li>
-                <li class="list-inline-item"><input type="submit" class="hidden" name="copy" id="a-copy" value="Copy">
-                    <a href="javascript:document.getElementById('a-copy').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-files-o"></i> <?php echo lng('Copy') ?> </a></li>
+                <?php if ($_SESSION['view'] == 'list'): ?>
+                    <li class="list-inline-item"> <a href="#/select-all" class="btn btn-small btn-outline-primary btn-2" onclick="select_all();return false;"><i class="fa fa-check-square"></i> <?php echo lng('SelectAll') ?> </a></li>
+                    <li class="list-inline-item"><a href="#/unselect-all" class="btn btn-small btn-outline-primary btn-2" onclick="unselect_all();return false;"><i class="fa fa-window-close"></i> <?php echo lng('UnSelectAll') ?> </a></li>
+                    <li class="list-inline-item"><a href="#/invert-all" class="btn btn-small btn-outline-primary btn-2" onclick="invert_all();return false;"><i class="fa fa-th-list"></i> <?php echo lng('InvertSelection') ?> </a></li>
+                    <li class="list-inline-item"><input type="submit" class="hidden" name="delete" id="a-delete" value="Delete" onclick="return confirm('<?php echo lng('Delete selected files and folders?'); ?>')">
+                        <a href="javascript:document.getElementById('a-delete').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-trash"></i> <?php echo lng('Delete') ?> </a></li>
+                    <li class="list-inline-item"><input type="submit" class="hidden" name="zip" id="a-zip" value="zip" onclick="return confirm('<?php echo lng('Create archive?'); ?>')">
+                        <a href="javascript:document.getElementById('a-zip').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-file-archive-o"></i> <?php echo lng('Zip') ?> </a></li>
+                    <li class="list-inline-item"><input type="submit" class="hidden" name="tar" id="a-tar" value="tar" onclick="return confirm('<?php echo lng('Create archive?'); ?>')">
+                        <a href="javascript:document.getElementById('a-tar').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-file-archive-o"></i> <?php echo lng('Tar') ?> </a></li>
+                    <li class="list-inline-item"><input type="submit" class="hidden" name="copy" id="a-copy" value="Copy">
+                        <a href="javascript:document.getElementById('a-copy').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-files-o"></i> <?php echo lng('Copy') ?> </a></li>
+                    <li class="list-inline-item"><input type="submit" class="hidden" name="grid" id="a-grid" value="Grid">
+                        <a href="javascript:document.getElementById('a-grid').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-th"></i> <?php echo lng('Grid') ?> </a></li>
+                <?php else: ?>
+                    <li class="list-inline-item"><input type="submit" class="hidden" name="list" id="a-list" value="List">
+                        <a href="javascript:document.getElementById('a-list').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-list"></i> <?php echo lng('List') ?> </a></li>
+                <?php endif ?>
             </ul>
         </div>
         <div class="col-3 d-none d-sm-block"><a href="https://tinyfilemanager.github.io" target="_blank" class="float-right text-muted">Tiny File Manager <?php echo VERSION; ?></a></div>
@@ -3143,7 +3238,8 @@ function fm_get_file_mimes($extension)
 }
 
 function fm_get_thumbnail($file, $p, $f) {
-    $thumbWidth = 160;
+    $thumbMaxWidth = 160;
+    $thumbMaxHeight= 160;
     $destImageFolder = FM_ROOT_PATH.FM_THUMB_FOLDER.'/'.$p;
     if (!file_exists($destImageFolder)) {
         mkdir($destImageFolder);
@@ -3153,7 +3249,15 @@ function fm_get_thumbnail($file, $p, $f) {
         $sourceImage = imagecreatefromjpeg($file);
         $orgWidth = imagesx($sourceImage);
         $orgHeight = imagesy($sourceImage);
-        $thumbHeight = floor($orgHeight * ($thumbWidth / $orgWidth));
+
+        if ($orgHeight > $thumbMaxHeight) {
+            $thumbHeight = $thumbMaxHeight;
+            $thumbWidth = floor($orgWidth * ($thumbHeight / $orgHeight));
+        }
+
+        // $thumbHeight = floor($orgHeight * ($thumbMaxWidth / $orgWidth));
+        // $thumbWidth = floor($orgWidth * ($thumbMaxHeight / $orgHeight));
+
         $destImage = imagecreatetruecolor($thumbWidth, $thumbHeight);
         imagecopyresampled($destImage, $sourceImage, 0, 0, 0, 0, $thumbWidth, $thumbHeight, $orgWidth, $orgHeight);
         imagejpeg($destImage, $destImagePath);
@@ -3879,6 +3983,11 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         .table-hover>tbody>tr:hover>td:first-child { border-left: 1px solid #1b77fd; }
         #main-table tr.even { background-color: #F8F9Fa; }
         .filename>a>i {margin-right: 3px;}
+
+        .grid-card {}
+        .grid-card-top { height:11rem;display:flex;flex-direction:row;justify-content:center;align-items: center; }
+        .grid-card-bottom { height:3rem;display:flex;flex-direction:row;justify-content:center;align-items: center; }
+        .grid-card-bottom .card-text { overflow: hidden;}
     </style>
     <?php
     if (FM_THEME == "dark"): ?>
