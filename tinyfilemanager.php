@@ -167,7 +167,10 @@ $external = array(
     'js-jquery-datatables' => '<script src="https://cdn.datatables.net/1.13.1/js/jquery.dataTables.min.js" crossorigin="anonymous" defer></script>',
     'js-highlightjs' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.6.0/highlight.min.js"></script>',
     'pre-jsdelivr' => '<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin/><link rel="dns-prefetch" href="https://cdn.jsdelivr.net"/>',
-    'pre-cloudflare' => '<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin/><link rel="dns-prefetch" href="https://cdnjs.cloudflare.com"/>'
+    'pre-cloudflare' => '<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin/><link rel="dns-prefetch" href="https://cdnjs.cloudflare.com"/>',
+
+    'css-lightbox' => '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simplelightbox@2.14.2/dist/simple-lightbox.min.css">',
+    'js-lightbox' => '<script src="https://cdn.jsdelivr.net/npm/simplelightbox@2.14.2/dist/simple-lightbox.jquery.min.js"></script>'
 );
 
 // --- EDIT BELOW CAREFULLY OR DO NOT EDIT AT ALL ---
@@ -2261,7 +2264,7 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
     <?php } else { ?>
         <div class="row">
             <?php if ($parent !== false) { ?>
-                <div class="col-sm-4 col-md-3 col-lg-2 mb-4">
+                <div class="col-6 col-sm-4 col-md-3 col-lg-2 mb-4">
                     <a href="?p=<?php echo urlencode($parent) ?>">
                         <div class="card text-center grid-card">
                             <div class="p-2 grid-card-top">
@@ -2283,7 +2286,7 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                 $img = $is_link ? 'icon-link_folder' : 'fa fa-folder-o';
             ?>
 
-                <div class="col-sm-4 col-md-3 col-lg-2 mb-4">
+                <div class="col-6 col-sm-4 col-md-3 col-lg-2 mb-4">
                     <a href="?p=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>">
                         <div class="card text-center grid-card">
                             <div class="p-2 grid-card-top">
@@ -2309,29 +2312,31 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                     $filesize = fm_get_filesize($filesize_raw);
                     $all_files_size += $filesize_raw;
             ?>
-                <div class="col-sm-4 col-md-3 col-lg-2 mb-4">
-                    <a href="<?php echo $filelink ?>">
-                        <div class="card text-center grid-card">
-                            <?php
-                            if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))) {
-                                $imagePreview = fm_get_thumbnail(fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f), FM_PATH, $f);
-                            ?>
-                                <div class="p-2" style="height: 11rem;">
+                <div class="col-6 col-sm-4 col-md-3 col-lg-2 mb-4">
+                    <div class="card text-center grid-card">
+                        <?php
+                        if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))) {
+                            $imagePreview = fm_get_thumbnail(fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f), FM_PATH, $f);
+                        ?>
+                            <div class="p-2 grid-card-top" style="height: 11rem;">
+                                <a href="<?php echo FM_ROOT_URL.'/'.FM_PATH.'/'.$f ?>">
                                     <img class="img-fluid rounded" src="<?php echo $imagePreview; ?>" alt="">
-                                </div>
-                            <?php } else {?>
-                                <div class="p-2 grid-card-top">
-                                    <i class="<?php echo $img ?>" style="font-size:5rem;"></i>
-                                </div>
-                            <?php }?>
-                            <div class="p-2 pt-0 grid-card-bottom">
+                                </a>
+                            </div>
+                        <?php } else {?>
+                            <div class="p-2 grid-card-top">
+                                <i class="<?php echo $img ?>" style="font-size:5rem;"></i>
+                            </div>
+                        <?php }?>
+                        <div class="p-2 pt-0 grid-card-bottom">
+                            <a href="<?php echo $filelink ?>">
                                 <p class="card-text">
                                     <?php echo fm_convert_win(fm_enc($f)) ?> <br>
                                     <?php echo($is_link ? ' &rarr; <i>' . readlink($path . '/' . $f) . '</i>' : '') ?>
                                 </p>
-                            </div>
+                            </a>
                         </div>
-                    </a>
+                    </div>
                 </div>
             <?php }?>
             <div>
@@ -3287,19 +3292,22 @@ function fm_get_thumbnail($file, $p, $f) {
     }
     if (!file_exists($destImagePath)) {
         $sourceImage = imagecreatefromjpeg($sourceFilePath);
+
+        $exifData = exif_read_data($sourceFilePath);
+        if (isset($exifData['Orientation'])){
+            $orientation = (int)$exifData['Orientation'];
+            if ($orientation == 3) $sourceImage = imagerotate($sourceImage, 180, 0);
+            if ($orientation == 6) $sourceImage = imagerotate($sourceImage, 270, 0);
+            if ($orientation == 8) $sourceImage = imagerotate($sourceImage, 90, 0);
+        }
+
         $orgWidth = imagesx($sourceImage);
         $orgHeight = imagesy($sourceImage);
 
-        if ($orgHeight > $thumbMaxHeight) {
-            $thumbHeight = $thumbMaxHeight;
-            $thumbWidth = floor($orgWidth * ($thumbHeight / $orgHeight));
-        }
+        $thumbSize = fm_resize_aspect($orgWidth, $orgHeight, $thumbMaxHeight, $thumbMaxWidth, false);
 
-        // $thumbHeight = floor($orgHeight * ($thumbMaxWidth / $orgWidth));
-        // $thumbWidth = floor($orgWidth * ($thumbMaxHeight / $orgHeight));
-
-        $destImage = imagecreatetruecolor($thumbWidth, $thumbHeight);
-        imagecopyresampled($destImage, $sourceImage, 0, 0, 0, 0, $thumbWidth, $thumbHeight, $orgWidth, $orgHeight);
+        $destImage = imagecreatetruecolor($thumbSize[0], $thumbSize[1]);
+        imagecopyresampled($destImage, $sourceImage, 0, 0, 0, 0, $thumbSize[0], $thumbSize[1], $orgWidth, $orgHeight);
         imagejpeg($destImage, $destImagePath);
         imagedestroy($sourceImage);
         imagedestroy($destImage);
@@ -3307,6 +3315,27 @@ function fm_get_thumbnail($file, $p, $f) {
     $thumbUrl = FM_ROOT_URL.FM_THUMB_FOLDER.'/'.$p.'/'.$f;
     // var_dump($thumbUrl);
     return $thumbUrl;
+}
+
+function fm_resize_aspect($image_width, $image_height, $max_width, $max_height, $enlarge)
+{
+    if (($image_width < $max_width) and ($image_height < $max_height) and !$enlarge) {
+        $resized_height = $image_height;
+        $resized_width = $image_width;
+    }
+    else {
+        $aspect_x = $image_width / $max_width;
+        $aspect_y = $image_height / $max_height;
+        if ($aspect_x > $aspect_y) {
+            $resized_width = $max_width;
+            $resized_height = $image_height / $aspect_x;
+        }
+        else {
+            $resized_height = $max_height;
+            $resized_width = $image_width / $aspect_y;
+        }
+    }
+    return [(int)round($resized_width), (int)round($resized_height)];
 }
 
 function math_div_string($string) {
@@ -3920,9 +3949,8 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
     <?php print_external('pre-cloudflare'); ?>
     <?php print_external('css-bootstrap'); ?>
     <?php print_external('css-font-awesome'); ?>
-    <?php if (FM_USE_HIGHLIGHTJS && isset($_GET['view'])): ?>
-    <?php print_external('css-highlightjs'); ?>
-    <?php endif; ?>
+    <?php if (FM_USE_HIGHLIGHTJS && isset($_GET['view'])) print_external('css-highlightjs'); ?>
+    <?php if ($_SESSION['view'] == 'grid') print_external('css-lightbox'); ?>
     <script type="text/javascript">window.csrf = '<?php echo $_SESSION['token']; ?>';</script>
     <style>
         html { -moz-osx-font-smoothing: grayscale; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; height: 100%; scroll-behavior: smooth;}
@@ -4044,10 +4072,16 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         #main-table tr.even { background-color: #F8F9Fa; }
         .filename>a>i {margin-right: 3px;}
 
-        .grid-card {}
+        .grid-card:hover { background: #d7d7d7; }
         .grid-card-top { height:11rem;display:flex;flex-direction:row;justify-content:center;align-items: center; }
         .grid-card-bottom { height:3rem;display:flex;flex-direction:row;justify-content:center;align-items: center; }
         .grid-card-bottom .card-text { overflow: hidden;}
+
+        .sl-overlay { background: #000; opacity: 0.9; }
+        .sl-wrapper .sl-navigation button,
+        .sl-wrapper .sl-close,
+        .sl-wrapper .sl-counter { color: #ccc; }
+        .sl-wrapper .sl-image { border: 2px solid #666; }
     </style>
     <?php
     if (FM_THEME == "dark"): ?>
@@ -4077,6 +4111,8 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
             .compact-table tr:hover td { background-color: #3d3d3d; }
             #main-table tr.even { background-color: #21292f; }
             form.dropzone { border-color: #79755e; }
+            .grid-card { color: #fff; background: #21292f; border-color: #79755e; }
+            .grid-card:hover { background: #79755e; }
         </style>
     <?php endif; ?>
 </head>
@@ -4189,7 +4225,6 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
 </div>
 <?php print_external('js-jquery'); ?>
 <?php print_external('js-bootstrap'); ?>
-<?php print_external('js-jquery-datatables'); ?>
 <?php if (FM_USE_HIGHLIGHTJS && isset($_GET['view'])): ?>
     <?php print_external('js-highlightjs'); ?>
     <script>hljs.highlightAll(); var isHighlightingEnabled = true;</script>
@@ -4200,22 +4235,6 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         while(match=re.exec(html)){add(html.slice(cursor,match.index))(match[1],!0);cursor=match.index+match[0].length}
         add(html.substr(cursor,html.length-cursor));code+='return r.join("");';return new Function(code.replace(/[\r\t\n]/g,'')).apply(options)
     }
-    function rename(e, t) { if(t) { $("#js-rename-from").val(t);$("#js-rename-to").val(t); $("#renameDailog").modal('show'); } }
-    function change_checkboxes(e, t) { for (var n = e.length - 1; n >= 0; n--) e[n].checked = "boolean" == typeof t ? t : !e[n].checked }
-    function get_checkboxes() { for (var e = document.getElementsByName("file[]"), t = [], n = e.length - 1; n >= 0; n--) (e[n].type = "checkbox") && t.push(e[n]); return t }
-    function select_all() { change_checkboxes(get_checkboxes(), !0) }
-    function unselect_all() { change_checkboxes(get_checkboxes(), !1) }
-    function invert_all() { change_checkboxes(get_checkboxes()) }
-    function checkbox_toggle() { var e = get_checkboxes(); e.push(this), change_checkboxes(e) }
-    function backup(e, t) { // Create file backup with .bck
-        var n = new XMLHttpRequest,
-            a = "path=" + e + "&file=" + t + "&token="+ window.csrf +"&type=backup&ajax=true";
-        return n.open("POST", "", !0), n.setRequestHeader("Content-type", "application/x-www-form-urlencoded"), n.onreadystatechange = function () {
-            4 == n.readyState && 200 == n.status && toast(n.responseText)
-        }, n.send(a), !1
-    }
-    // Toast message
-    function toast(txt) { var x = document.getElementById("snackbar");x.innerHTML=txt;x.className = "show";setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000); }
     // Save file
     function edit_save(e, t) {
         var n = "ace" == t ? editor.getSession().getValue() : document.getElementById("normal-editor").value;
@@ -4326,35 +4345,55 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         $confirmDailog.modal('show');
         return false;
     }
-
-
-    // on mouse hover image preview
-    !function(s){s.previewImage=function(e){var o=s(document),t=".previewImage",a=s.extend({xOffset:20,yOffset:-20,fadeIn:"fast",css:{padding:"5px",border:"1px solid #cccccc","background-color":"#fff"},eventSelector:"[data-preview-image]",dataKey:"previewImage",overlayId:"preview-image-plugin-overlay"},e);return o.off(t),o.on("mouseover"+t,a.eventSelector,function(e){s("p#"+a.overlayId).remove();var o=s("<p>").attr("id",a.overlayId).css("position","absolute").css("display","none").append(s('<img class="c-preview-img">').attr("src",s(this).data(a.dataKey)));a.css&&o.css(a.css),s("body").append(o),o.css("top",e.pageY+a.yOffset+"px").css("left",e.pageX+a.xOffset+"px").fadeIn(a.fadeIn)}),o.on("mouseout"+t,a.eventSelector,function(){s("#"+a.overlayId).remove()}),o.on("mousemove"+t,a.eventSelector,function(e){s("#"+a.overlayId).css("top",e.pageY+a.yOffset+"px").css("left",e.pageX+a.xOffset+"px")}),this},s.previewImage()}(jQuery);
-
-    // Dom Ready Events
-    $(document).ready( function () {
-        // dataTable init
-        var $table = $('#main-table'),
-            tableLng = $table.find('th').length,
-            _targets = (tableLng && tableLng == 7 ) ? [0, 4,5,6] : tableLng == 5 ? [0,4] : [3];
-            mainTable = $('#main-table').DataTable({paging: false, info: false, order: [], columnDefs: [{targets: _targets, orderable: false}]
-        });
-        // filter table
-        $('#search-addon').on( 'keyup', function () {
-            mainTable.search( this.value ).draw();
-        });
-        $("input#advanced-search").on('keyup', function (e) {
-            if (e.keyCode === 13) { fm_search(); }
-        });
-        $('#search-addon3').on( 'click', function () { fm_search(); });
-        //upload nav tabs
-        $(".fm-upload-wrapper .card-header-tabs").on("click", 'a', function(e){
-            e.preventDefault();let target=$(this).data('target');
-            $(".fm-upload-wrapper .card-header-tabs a").removeClass('active');$(this).addClass('active');
-            $(".fm-upload-wrapper .card-tabs-container").addClass('hidden');$(target).removeClass('hidden');
-        });
-    });
 </script>
+<?php if ($_SESSION['view'] == 'list'):?>
+    <?php print_external('js-jquery-datatables'); ?>
+    <script>
+        function rename(e, t) { if(t) { $("#js-rename-from").val(t);$("#js-rename-to").val(t); $("#renameDailog").modal('show'); } }
+        function change_checkboxes(e, t) { for (var n = e.length - 1; n >= 0; n--) e[n].checked = "boolean" == typeof t ? t : !e[n].checked }
+        function get_checkboxes() { for (var e = document.getElementsByName("file[]"), t = [], n = e.length - 1; n >= 0; n--) (e[n].type = "checkbox") && t.push(e[n]); return t }
+        function select_all() { change_checkboxes(get_checkboxes(), !0) }
+        function unselect_all() { change_checkboxes(get_checkboxes(), !1) }
+        function invert_all() { change_checkboxes(get_checkboxes()) }
+        function checkbox_toggle() { var e = get_checkboxes(); e.push(this), change_checkboxes(e) }
+        function backup(e, t) { // Create file backup with .bck
+            var n = new XMLHttpRequest,
+                a = "path=" + e + "&file=" + t + "&token="+ window.csrf +"&type=backup&ajax=true";
+            return n.open("POST", "", !0), n.setRequestHeader("Content-type", "application/x-www-form-urlencoded"), n.onreadystatechange = function () {
+                4 == n.readyState && 200 == n.status && toast(n.responseText)
+            }, n.send(a), !1
+        }
+        // Toast message
+        function toast(txt) { var x = document.getElementById("snackbar");x.innerHTML=txt;x.className = "show";setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000); }
+
+        // on mouse hover image preview
+        !function(s){s.previewImage=function(e){var o=s(document),t=".previewImage",a=s.extend({xOffset:20,yOffset:-20,fadeIn:"fast",css:{padding:"5px",border:"1px solid #cccccc","background-color":"#fff"},eventSelector:"[data-preview-image]",dataKey:"previewImage",overlayId:"preview-image-plugin-overlay"},e);return o.off(t),o.on("mouseover"+t,a.eventSelector,function(e){s("p#"+a.overlayId).remove();var o=s("<p>").attr("id",a.overlayId).css("position","absolute").css("display","none").append(s('<img class="c-preview-img">').attr("src",s(this).data(a.dataKey)));a.css&&o.css(a.css),s("body").append(o),o.css("top",e.pageY+a.yOffset+"px").css("left",e.pageX+a.xOffset+"px").fadeIn(a.fadeIn)}),o.on("mouseout"+t,a.eventSelector,function(){s("#"+a.overlayId).remove()}),o.on("mousemove"+t,a.eventSelector,function(e){s("#"+a.overlayId).css("top",e.pageY+a.yOffset+"px").css("left",e.pageX+a.xOffset+"px")}),this},s.previewImage()}(jQuery);
+
+        // Dom Ready Events
+        $(document).ready( function () {
+            // dataTable init
+            var $table = $('#main-table'),
+                tableLng = $table.find('th').length,
+                _targets = (tableLng && tableLng == 7 ) ? [0, 4,5,6] : tableLng == 5 ? [0,4] : [3];
+                mainTable = $('#main-table').DataTable({paging: false, info: false, order: [], columnDefs: [{targets: _targets, orderable: false}]
+            });
+            // filter table
+            $('#search-addon').on( 'keyup', function () {
+                mainTable.search( this.value ).draw();
+            });
+            $("input#advanced-search").on('keyup', function (e) {
+                if (e.keyCode === 13) { fm_search(); }
+            });
+            $('#search-addon3').on( 'click', function () { fm_search(); });
+            //upload nav tabs
+            $(".fm-upload-wrapper .card-header-tabs").on("click", 'a', function(e){
+                e.preventDefault();let target=$(this).data('target');
+                $(".fm-upload-wrapper .card-header-tabs a").removeClass('active');$(this).addClass('active');
+                $(".fm-upload-wrapper .card-tabs-container").addClass('hidden');$(target).removeClass('hidden');
+            });
+        });
+    </script>
+<?php endif; ?>
 <?php if (isset($_GET['edit']) && isset($_GET['env']) && FM_EDIT_FILE && !FM_READONLY):
 
         $ext = pathinfo($_GET["edit"], PATHINFO_EXTENSION);
@@ -4409,6 +4448,17 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
                 }else if(selectedValue && selectionType == "fontSize") {
                     editor.setFontSize(parseInt(selectedValue));
                 }
+            });
+        });
+    </script>
+<?php endif; ?>
+<?php if ($_SESSION['view'] == 'grid'): ?>
+    <?php print_external('js-lightbox'); ?>
+    <script>
+         $(document).ready( function () {
+            $('.grid-card-top a').simpleLightbox({
+                widthRatio: 0.9,
+                overlayOpacity: 0.9
             });
         });
     </script>
