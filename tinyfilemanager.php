@@ -86,6 +86,11 @@ $datetime_format = 'm/d/Y g:i A';
 // 'host' => show path on the host
 $path_display_mode = 'full';
 
+// Default sort ordering for grid view
+// This will sort only the files
+// nameAsc | nameDesc | dateAsc | dateDesc
+$grid_view_default_sort = 'nameAsc';
+
 // Allowed file extensions for create and rename files
 // e.g. 'txt,html,css,js'
 $allowed_file_extensions = '';
@@ -1286,17 +1291,16 @@ if (isset($_POST['chmod'], $_POST['token']) && !FM_READONLY && !FM_IS_WIN) {
     $FM_PATH=FM_PATH; fm_redirect(FM_SELF_URL . '?p=' . urlencode($FM_PATH));
 }
 
-if (!isset($_SESSION['view'])) {
-    $_SESSION['view'] = 'list';
-}
+if (!isset($_SESSION['view'])) $_SESSION['view'] = 'list';
+if (isset($_POST['list'])) $_SESSION['view'] = 'list';
+if (isset($_POST['grid'])) $_SESSION['view'] = 'grid';
 
-if (isset($_POST['list'])) {
-    $_SESSION['view'] = 'list';
-}
+if (!isset($_SESSION['order'])) $_SESSION['order'] = $grid_view_default_sort;
+if (isset($_POST['nameAsc'])) $_SESSION['order'] = 'nameAsc';
+if (isset($_POST['nameDesc'])) $_SESSION['order'] = 'nameDesc';
+if (isset($_POST['dateAsc'])) $_SESSION['order'] = 'dateAsc';
+if (isset($_POST['dateDesc'])) $_SESSION['order'] = 'dateDesc';
 
-if (isset($_POST['grid'])) {
-    $_SESSION['view'] = 'grid';
-}
 
 /*************************** ACTIONS ***************************/
 
@@ -1336,7 +1340,16 @@ if (is_array($objects) && fm_is_exclude_items($current_path)) {
 }
 
 if (!empty($files)) {
-    natcasesort($files);
+    if ($_SESSION['order'] == 'dateAsc') {
+        usort($files, function($a, $b) use ($path) { return filemtime($path.'/'.$a) - filemtime($path.'/'.$b); });
+    } else if ($_SESSION['order'] == 'dateDesc') {
+        usort($files, function($a, $b) use ($path) { return filemtime($path.'/'.$b) - filemtime($path.'/'.$a); });
+    } else if ($_SESSION['order'] == 'nameDesc') {
+        natcasesort($files);
+        $files = array_reverse($files, false);
+    } else {
+        natcasesort($files);
+    }
 }
 if (!empty($folders)) {
     natcasesort($folders);
@@ -2372,6 +2385,14 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                     <li class="list-inline-item"><input type="submit" class="hidden" name="grid" id="a-grid" value="Grid">
                         <a href="javascript:document.getElementById('a-grid').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-th"></i> <?php echo lng('Grid') ?> </a></li>
                 <?php else: ?>
+                    <li class="list-inline-item"><input type="submit" class="hidden" name="nameAsc" id="a-nameAsc" value="nameAsc">
+                        <a href="javascript:document.getElementById('a-nameAsc').click();" class="btn btn-small btn-outline-primary btn-2 <?php if ($_SESSION['order'] == 'nameAsc') echo ' active'; ?>"><i class="fa fa-sort-alpha-asc"></i> <?php echo lng('Name Asc') ?> </a></li>
+                    <li class="list-inline-item"><input type="submit" class="hidden" name="nameDesc" id="a-nameDesc" value="nameDesc">
+                        <a href="javascript:document.getElementById('a-nameDesc').click();" class="btn btn-small btn-outline-primary btn-2 <?php if ($_SESSION['order'] == 'nameDesc') echo ' active'; ?>"><i class="fa fa-sort-alpha-desc"></i> <?php echo lng('Name Desc') ?> </a></li>
+                    <li class="list-inline-item"><input type="submit" class="hidden" name="dateAsc" id="a-dateAsc" value="dateAsc">
+                        <a href="javascript:document.getElementById('a-dateAsc').click();" class="btn btn-small btn-outline-primary btn-2 <?php if ($_SESSION['order'] == 'dateAsc') echo ' active'; ?>"><i class="fa fa-sort-numeric-asc"></i> <?php echo lng('Date Asc') ?> </a></li>
+                    <li class="list-inline-item"><input type="submit" class="hidden" name="dateDesc" id="a-dateDesc" value="dateDesc">
+                        <a href="javascript:document.getElementById('a-dateDesc').click();" class="btn btn-small btn-outline-primary btn-2 <?php if ($_SESSION['order'] == 'dateDesc') echo ' active'; ?>"><i class="fa fa-sort-numeric-desc"></i> <?php echo lng('Date Desc') ?> </a></li>
                     <li class="list-inline-item"><input type="submit" class="hidden" name="list" id="a-list" value="List">
                         <a href="javascript:document.getElementById('a-list').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-list"></i> <?php echo lng('List') ?> </a></li>
                 <?php endif ?>
@@ -3358,6 +3379,12 @@ function drop_zero_fraction($value, $decimals) {
     return number_format($value, $decimals);
 }
 
+function dump($obj, $pre = true) {
+    if ($pre) echo '<pre>';
+    var_dump($obj);
+    if ($pre) echo '</pre>';
+}
+
 /**
  * This function scans the files and folder recursively, and return matching files
  * @param string $dir
@@ -4077,7 +4104,7 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         .grid-card-bottom { height:3rem;display:flex;flex-direction:row;justify-content:center;align-items: center; }
         .grid-card-bottom .card-text { overflow: hidden;}
 
-        .sl-overlay { background: #000; opacity: 0.9; }
+        .sl-overlay { background: #000; }
         .sl-wrapper .sl-navigation button,
         .sl-wrapper .sl-close,
         .sl-wrapper .sl-counter { color: #ccc; }
