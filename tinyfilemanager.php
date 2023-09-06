@@ -106,9 +106,10 @@ $favicon_path = '';
 
 // Files and folders to excluded from listing
 // e.g. array('myfile.html', 'personal-folder', '*.php', ...)
-$exclude_items = array(
-    substr($thumb_folder, 1)
-);
+$exclude_items = array();
+
+// Folder for thumbnails always should be exluded
+array_push($exclude_items, substr($thumb_folder, 1));
 
 // Online office Docs Viewer
 // Availabe rules are 'google', 'microsoft' or false
@@ -1765,9 +1766,9 @@ if (isset($_GET['view'])) {
                     $image_size = getimagesize($file_path);
                     $exifData = exif_read_data($file_path);
                     echo '<strong>'.lng('Image size').':</strong> ' . (isset($image_size[0]) ? $image_size[0] : '0') . ' x ' . (isset($image_size[1]) ? $image_size[1] : '0') . '<br>';
-                    echo '<br>';
 
                     if ($exifData) {
+                        echo '<br>';
                         $exp_time = round(math_div_string($exifData['ExposureTime']),2);
                         $exposureTime = $exp_time > 0.25 ? $exp_time : $exifData['ExposureTime'];
 
@@ -1778,7 +1779,9 @@ if (isset($_GET['view'])) {
 
                         echo '<strong>EXIF</strong><br>';
                         echo '<strong>Camera:</strong> '.$exifData['Make'].' '.$exifData['Model'].'<br>';
-                        echo '<strong>Lens:</strong> '.$exifData['UndefinedTag:0xA434'].'<br>';
+                        if (isset($exifData['UndefinedTag:0xA434'])) {
+                            echo '<strong>Lens:</strong> '.$exifData['UndefinedTag:0xA434'].'<br>';
+                        }
                         echo '<strong>Taken:</strong> '.$datetimeOriginal.'<br>';
                         echo '<strong>Shutter:</strong> '.$exposureTime.'s<br>';
                         echo '<strong>Aperature:</strong> f'.drop_zero_fraction(round(math_div_string($exifData['FNumber']),1),1).'<br>';
@@ -2085,7 +2088,7 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
     <input type="hidden" name="p" value="<?php echo fm_enc(FM_PATH) ?>">
     <input type="hidden" name="group" value="1">
     <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>">
-    <?php if ($_SESSION['view'] == 'list') { ?>
+    <?php if ($_SESSION['view'] == 'list'): ?>
         <div class="table-responsive">
             <table class="table table-bordered table-hover table-sm <?php echo $tableTheme; ?>" id="main-table">
                 <thead class="thead-white">
@@ -2216,16 +2219,15 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                             </td><?php endif; ?>
                         <td data-sort=<?php echo fm_enc($f) ?>>
                             <div class="filename">
-                            <?php
-                            if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))): ?>
-                                    <?php $imagePreview = fm_get_thumbnail(fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f), FM_PATH, $f); ?>
-                                    <a href="<?php echo $filelink ?>" data-preview-image="<?php echo $imagePreview ?>" title="<?php echo fm_enc($f) ?>">
+                            <?php if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))): ?>
+                                <?php $imagePreview = fm_get_thumbnail(FM_PATH, $f); ?>
+                                <a href="<?php echo $filelink ?>" data-preview-image="<?php echo $imagePreview ?>" title="<?php echo fm_enc($f) ?>">
                             <?php else: ?>
-                                    <a href="<?php echo $filelink ?>" title="<?php echo $f ?>">
-                                <?php endif; ?>
-                                        <i class="<?php echo $img ?>"></i> <?php echo fm_convert_win(fm_enc($f)) ?>
-                                    </a>
-                                    <?php echo($is_link ? ' &rarr; <i>' . readlink($path . '/' . $f) . '</i>' : '') ?>
+                                <a href="<?php echo $filelink ?>" title="<?php echo $f ?>">
+                            <?php endif; ?>
+                                    <i class="<?php echo $img ?>"></i> <?php echo fm_convert_win(fm_enc($f)) ?>
+                                </a>
+                                <?php echo($is_link ? ' &rarr; <i>' . readlink($path . '/' . $f) . '</i>' : '') ?>
                             </div>
                         </td>
                         <td data-order="b-<?php echo str_pad($filesize_raw, 18, "0", STR_PAD_LEFT); ?>"><span title="<?php printf('%s bytes', $filesize_raw) ?>">
@@ -2260,8 +2262,8 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                             <td colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? '6' : '4' ?>"><em><?php echo lng('Folder is empty') ?></em></td>
                         </tr>
                     </tfoot>
-                    <?php
-                } else { ?>
+                <?php
+            } else { ?>
                     <tfoot>
                         <tr>
                             <td class="gray" colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? (FM_READONLY ? '6' :'7') : (FM_READONLY ? '4' : '5') ?>">
@@ -2271,12 +2273,12 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                             </td>
                         </tr>
                     </tfoot>
-                    <?php } ?>
+                <?php } ?>
             </table>
         </div>
-    <?php } else { ?>
+    <?php else: ?>
         <div class="row">
-            <?php if ($parent !== false) { ?>
+            <?php if ($parent !== false): ?>
                 <div class="col-6 col-sm-4 col-md-3 col-lg-2 mb-4">
                     <a href="?p=<?php echo urlencode($parent) ?>">
                         <div class="card text-center grid-card">
@@ -2291,14 +2293,13 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                         </div>
                     </a>
                 </div>
-            <?php } ?>
+            <?php endif; ?>
 
             <?php
-            foreach ($folders as $f) {
+            foreach ($folders as $f):
                 $is_link = is_link($path . '/' . $f);
                 $img = $is_link ? 'icon-link_folder' : 'fa fa-folder-o';
             ?>
-
                 <div class="col-6 col-sm-4 col-md-3 col-lg-2 mb-4">
                     <a href="?p=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>">
                         <div class="card text-center grid-card">
@@ -2314,10 +2315,10 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                         </div>
                     </a>
                 </div>
-            <?php } ?>
+            <?php endforeach; ?>
 
             <?php
-            foreach ($files as $f) {
+            foreach ($files as $f):
                     $is_link = is_link($path . '/' . $f);
                     $img = $is_link ? 'fa fa-file-text-o' : fm_get_file_icon_class($path . '/' . $f);
                     $filelink = '?p=' . urlencode(FM_PATH) . '&amp;view=' . urlencode($f);
@@ -2328,19 +2329,19 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                 <div class="col-6 col-sm-4 col-md-3 col-lg-2 mb-4">
                     <div class="card text-center grid-card">
                         <?php
-                        if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))) {
-                            $imagePreview = fm_get_thumbnail(fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f), FM_PATH, $f);
+                        if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))):
+                            $imageThumbnail = fm_get_thumbnail(FM_PATH, $f);
                         ?>
                             <div class="p-2 grid-card-top" style="height: 11rem;">
                                 <a href="<?php echo FM_ROOT_URL.'/'.FM_PATH.'/'.$f ?>">
-                                    <img class="img-fluid rounded" src="<?php echo $imagePreview; ?>" alt="">
+                                    <img class="img-fluid rounded" src="<?php echo $imageThumbnail; ?>" alt="">
                                 </a>
                             </div>
-                        <?php } else {?>
+                        <?php else: ?>
                             <div class="p-2 grid-card-top">
                                 <i class="<?php echo $img ?>" style="font-size:5rem;"></i>
                             </div>
-                        <?php }?>
+                        <?php endif; ?>
                         <div class="p-2 pt-0 grid-card-bottom">
                             <a href="<?php echo $filelink ?>">
                                 <p class="card-text">
@@ -2351,11 +2352,11 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                         </div>
                     </div>
                 </div>
-            <?php }?>
+            <?php endforeach; ?>
             <div>
                 <table class="table table-bordered table-sm <?php echo $tableTheme; ?>">
                     <tr>
-                        <td class="gray" colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? (FM_READONLY ? '6' :'7') : (FM_READONLY ? '4' : '5') ?>">
+                        <td class="gray">
                             <?php echo lng('FullSize').': <span class="badge text-bg-light border-radius-0">'.fm_get_filesize($all_files_size).'</span>' ?>
                             <?php echo lng('File').': <span class="badge text-bg-light border-radius-0">'.$num_files.'</span>' ?>
                             <?php echo lng('Folder').': <span class="badge text-bg-light border-radius-0">'.$num_folders.'</span>' ?>
@@ -2364,7 +2365,7 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                 </table>
             </div>
         </div>
-    <?php } ?>
+    <?php endif; ?>
 
     <div class="row">
         <?php if (!FM_READONLY): ?>
@@ -2383,7 +2384,7 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                     <li class="list-inline-item"><input type="submit" class="hidden" name="copy" id="a-copy" value="Copy">
                         <a href="javascript:document.getElementById('a-copy').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-files-o"></i> <?php echo lng('Copy') ?> </a></li>
                     <li class="list-inline-item"><input type="submit" class="hidden" name="grid" id="a-grid" value="Grid">
-                        <a href="javascript:document.getElementById('a-grid').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-th"></i> <?php echo lng('Grid') ?> </a></li>
+                        <a href="javascript:document.getElementById('a-grid').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-th"></i> <?php echo lng('Grid view') ?> </a></li>
                 <?php else: ?>
                     <li class="list-inline-item"><input type="submit" class="hidden" name="nameAsc" id="a-nameAsc" value="nameAsc">
                         <a href="javascript:document.getElementById('a-nameAsc').click();" class="btn btn-small btn-outline-primary btn-2 <?php if ($_SESSION['order'] == 'nameAsc') echo ' active'; ?>"><i class="fa fa-sort-alpha-asc"></i> <?php echo lng('Name Asc') ?> </a></li>
@@ -2394,11 +2395,11 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                     <li class="list-inline-item"><input type="submit" class="hidden" name="dateDesc" id="a-dateDesc" value="dateDesc">
                         <a href="javascript:document.getElementById('a-dateDesc').click();" class="btn btn-small btn-outline-primary btn-2 <?php if ($_SESSION['order'] == 'dateDesc') echo ' active'; ?>"><i class="fa fa-sort-numeric-desc"></i> <?php echo lng('Date Desc') ?> </a></li>
                     <li class="list-inline-item"><input type="submit" class="hidden" name="list" id="a-list" value="List">
-                        <a href="javascript:document.getElementById('a-list').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-list"></i> <?php echo lng('List') ?> </a></li>
+                        <a href="javascript:document.getElementById('a-list').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-list"></i> <?php echo lng('List view') ?> </a></li>
                 <?php endif ?>
             </ul>
         </div>
-        <div class="col-3 d-none d-sm-block"><a href="https://tinyfilemanager.github.io" target="_blank" class="float-right text-muted">Tiny File Manager <?php echo VERSION; ?></a></div>
+        <div class="col-3 d-none d-sm-block"><a href="https://tinyfilemanager.github.io" target="_blank" class="float-right text-muted">Tiny File Manager <?php echo VERSION; ?> zolimod</a></div>
         <?php else: ?>
             <div class="col-12"><a href="https://tinyfilemanager.github.io" target="_blank" class="float-right text-muted">Tiny File Manager <?php echo VERSION; ?></a></div>
         <?php endif; ?>
@@ -3302,17 +3303,22 @@ function fm_get_file_mimes($extension)
     return $fileTypes[$extension];
 }
 
-function fm_get_thumbnail($file, $p, $f) {
-    $thumbMaxWidth = 160;
-    $thumbMaxHeight= 160;
+function fm_get_thumbnail($p, $f) {
     $destImageFolder = FM_ROOT_PATH.FM_THUMB_FOLDER.'/'.urldecode($p);
-    $sourceFilePath = FM_ROOT_PATH.'/'.$p.'/'.$f;
     $destImagePath = $destImageFolder.'/'.$f;
     if (!file_exists($destImageFolder)) {
         mkdir($destImageFolder, 0777, true);
     }
     if (!file_exists($destImagePath)) {
-        $sourceImage = imagecreatefromjpeg($sourceFilePath);
+        $thumbMaxWidth = 160;
+        $thumbMaxHeight= 160;
+        $sourceFilePath = FM_ROOT_PATH.'/'.$p.'/'.$f;
+        $fileInfo = getimagesize(FM_ROOT_PATH.'/'.$p.'/'.$f);
+        if($fileInfo['mime'] =='image/jpeg'){
+            $sourceImage = imagecreatefromjpeg($sourceFilePath);
+        } else if($fileInfo['mime'] =='image/png'){
+            $sourceImage = imagecreatefrompng($sourceFilePath);
+        }
 
         $exifData = exif_read_data($sourceFilePath);
         if (isset($exifData['Orientation'])){
@@ -3334,12 +3340,10 @@ function fm_get_thumbnail($file, $p, $f) {
         imagedestroy($destImage);
     }
     $thumbUrl = FM_ROOT_URL.FM_THUMB_FOLDER.'/'.$p.'/'.$f;
-    // var_dump($thumbUrl);
     return $thumbUrl;
 }
 
-function fm_resize_aspect($image_width, $image_height, $max_width, $max_height, $enlarge)
-{
+function fm_resize_aspect($image_width, $image_height, $max_width, $max_height, $enlarge) {
     if (($image_width < $max_width) and ($image_height < $max_height) and !$enlarge) {
         $resized_height = $image_height;
         $resized_width = $image_width;
@@ -4262,6 +4266,8 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         while(match=re.exec(html)){add(html.slice(cursor,match.index))(match[1],!0);cursor=match.index+match[0].length}
         add(html.substr(cursor,html.length-cursor));code+='return r.join("");';return new Function(code.replace(/[\r\t\n]/g,'')).apply(options)
     }
+    // Toast message
+    function toast(txt) { var x = document.getElementById("snackbar");x.innerHTML=txt;x.className = "show";setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000); }
     // Save file
     function edit_save(e, t) {
         var n = "ace" == t ? editor.getSession().getValue() : document.getElementById("normal-editor").value;
@@ -4372,6 +4378,20 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         $confirmDailog.modal('show');
         return false;
     }
+
+    // Dom Ready Events
+    $(document).ready( function () {
+        $("input#advanced-search").on('keyup', function (e) {
+            if (e.keyCode === 13) { fm_search(); }
+        });
+        $('#search-addon3').on( 'click', function () { fm_search(); });
+        //upload nav tabs
+        $(".fm-upload-wrapper .card-header-tabs").on("click", 'a', function(e){
+            e.preventDefault();let target=$(this).data('target');
+            $(".fm-upload-wrapper .card-header-tabs a").removeClass('active');$(this).addClass('active');
+            $(".fm-upload-wrapper .card-tabs-container").addClass('hidden');$(target).removeClass('hidden');
+        });
+    });
 </script>
 <?php if ($_SESSION['view'] == 'list'):?>
     <?php print_external('js-jquery-datatables'); ?>
@@ -4390,8 +4410,6 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
                 4 == n.readyState && 200 == n.status && toast(n.responseText)
             }, n.send(a), !1
         }
-        // Toast message
-        function toast(txt) { var x = document.getElementById("snackbar");x.innerHTML=txt;x.className = "show";setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000); }
 
         // on mouse hover image preview
         !function(s){s.previewImage=function(e){var o=s(document),t=".previewImage",a=s.extend({xOffset:20,yOffset:-20,fadeIn:"fast",css:{padding:"5px",border:"1px solid #cccccc","background-color":"#fff"},eventSelector:"[data-preview-image]",dataKey:"previewImage",overlayId:"preview-image-plugin-overlay"},e);return o.off(t),o.on("mouseover"+t,a.eventSelector,function(e){s("p#"+a.overlayId).remove();var o=s("<p>").attr("id",a.overlayId).css("position","absolute").css("display","none").append(s('<img class="c-preview-img">').attr("src",s(this).data(a.dataKey)));a.css&&o.css(a.css),s("body").append(o),o.css("top",e.pageY+a.yOffset+"px").css("left",e.pageX+a.xOffset+"px").fadeIn(a.fadeIn)}),o.on("mouseout"+t,a.eventSelector,function(){s("#"+a.overlayId).remove()}),o.on("mousemove"+t,a.eventSelector,function(e){s("#"+a.overlayId).css("top",e.pageY+a.yOffset+"px").css("left",e.pageX+a.xOffset+"px")}),this},s.previewImage()}(jQuery);
@@ -4407,16 +4425,6 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
             // filter table
             $('#search-addon').on( 'keyup', function () {
                 mainTable.search( this.value ).draw();
-            });
-            $("input#advanced-search").on('keyup', function (e) {
-                if (e.keyCode === 13) { fm_search(); }
-            });
-            $('#search-addon3').on( 'click', function () { fm_search(); });
-            //upload nav tabs
-            $(".fm-upload-wrapper .card-header-tabs").on("click", 'a', function(e){
-                e.preventDefault();let target=$(this).data('target');
-                $(".fm-upload-wrapper .card-header-tabs a").removeClass('active');$(this).addClass('active');
-                $(".fm-upload-wrapper .card-tabs-container").addClass('hidden');$(target).removeClass('hidden');
             });
         });
     </script>
@@ -4563,6 +4571,12 @@ function lng($txt) {
     $tr['en']['Invalid characters in file or folder name']      = 'Invalid characters in file or folder name';
     $tr['en']['Operations with archives are not available']     = 'Operations with archives are not available';
     $tr['en']['File or folder with this path already exists']   = 'File or folder with this path already exists';
+    $tr['en']['Grid view'] = 'Grid view';
+    $tr['en']['List view'] = 'List view';
+    $tr['en']['Name Asc'] = 'Name Asc';
+    $tr['en']['Name Desc'] = 'Name Desc';
+    $tr['en']['Date Asc'] = 'Date Asc';
+    $tr['en']['Date Desc'] = 'Date Desc';
 
     $i18n = fm_get_translations($tr);
     $tr = $i18n ? $i18n : $tr;
