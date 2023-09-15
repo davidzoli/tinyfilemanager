@@ -2267,9 +2267,9 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                     <tfoot>
                         <tr>
                             <td class="gray" colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? (FM_READONLY ? '6' :'7') : (FM_READONLY ? '4' : '5') ?>">
-                                <?php echo lng('FullSize').': <span class="badge text-bg-light border-radius-0">'.fm_get_filesize($all_files_size).'</span>' ?>
-                                <?php echo lng('File').': <span class="badge text-bg-light border-radius-0">'.$num_files.'</span>' ?>
+                                <?php echo lng('Folder Size').': <span class="badge text-bg-light border-radius-0">'.fm_get_filesize(fm_dir_size_recursive(FM_ROOT_PATH.'/'.FM_PATH)).'</span>' ?>
                                 <?php echo lng('Folder').': <span class="badge text-bg-light border-radius-0">'.$num_folders.'</span>' ?>
+                                <?php echo lng('File').': <span class="badge text-bg-light border-radius-0">'.$num_files.'</span>' ?>
                             </td>
                         </tr>
                     </tfoot>
@@ -2357,9 +2357,9 @@ $tableTheme = (FM_THEME == "dark") ? "text-white bg-dark table-dark" : "bg-white
                 <table class="table table-bordered table-sm <?php echo $tableTheme; ?>">
                     <tr>
                         <td class="gray">
-                            <?php echo lng('FullSize').': <span class="badge text-bg-light border-radius-0">'.fm_get_filesize($all_files_size).'</span>' ?>
-                            <?php echo lng('File').': <span class="badge text-bg-light border-radius-0">'.$num_files.'</span>' ?>
+                            <?php echo lng('Folder Size').': <span class="badge text-bg-light border-radius-0">'.fm_get_filesize(fm_dir_size_recurse(FM_ROOT_PATH.'/'.FM_PATH)).'</span>' ?>
                             <?php echo lng('Folder').': <span class="badge text-bg-light border-radius-0">'.$num_folders.'</span>' ?>
+                            <?php echo lng('File').': <span class="badge text-bg-light border-radius-0">'.$num_files.'</span>' ?>
                         </td>
                     </tr>
                 </table>
@@ -3361,6 +3361,17 @@ function fm_resize_aspect($image_width, $image_height, $max_width, $max_height, 
         }
     }
     return [(int)round($resized_width), (int)round($resized_height)];
+}
+
+function fm_dir_size_recursive($path){
+    $bytestotal = 0;
+    $path = realpath($path);
+    if($path!==false && $path!='' && file_exists($path)){
+        foreach(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS)) as $object){
+            $bytestotal += $object->getSize();
+        }
+    }
+    return $bytestotal;
 }
 
 function math_div_string($string) {
@@ -4577,6 +4588,7 @@ function lng($txt) {
     $tr['en']['Name Desc'] = 'Name Desc';
     $tr['en']['Date Asc'] = 'Date Asc';
     $tr['en']['Date Desc'] = 'Date Desc';
+    $tr['en']['Folder Size'] = 'Folder Size';
 
     $i18n = fm_get_translations($tr);
     $tr = $i18n ? $i18n : $tr;
